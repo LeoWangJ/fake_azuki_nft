@@ -8,6 +8,9 @@ import "erc721a/contracts/ERC721A.sol";
 import "erc721a/contracts/extensions/ERC721AOwnersExplicit.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
+/**
+ * dev mint => auction => allow list => public(未到這步)
+ */
 contract Leozuki is Ownable, ERC721A, ERC721AOwnersExplicit, ReentrancyGuard {
     /*
      * maxPerAddressDuringMint - 最大 mint 數量
@@ -21,6 +24,13 @@ contract Leozuki is Ownable, ERC721A, ERC721AOwnersExplicit, ReentrancyGuard {
     uint256 public immutable amountForAuctionAndDev;
     uint256 public immutable collectionSize;
 
+    /**
+     * auctionSaleStartTime - 荷拍開始時間
+     * publicSaleStartTime - 公開發售開始時間
+     * mintlistPrice -
+     * publicPrice -
+     * publicSaleKey -
+     */
     struct SaleConfig {
         uint32 auctionSaleStartTime;
         uint32 publicSaleStartTime;
@@ -38,7 +48,7 @@ contract Leozuki is Ownable, ERC721A, ERC721AOwnersExplicit, ReentrancyGuard {
         uint256 collectionSize_,
         uint256 amountForAuctionAndDev_,
         uint256 amountForDevs_
-    ) ERC721A("Leozuki", "LEOZUKI") {
+    ) ERC721A("Azuki", "AZUKI") {
         maxPerAddressDuringMint = maxBatchSize_;
         amountForAuctionAndDev = amountForAuctionAndDev_;
         amountForDevs = amountForDevs_;
@@ -114,6 +124,7 @@ contract Leozuki is Ownable, ERC721A, ERC721AOwnersExplicit, ReentrancyGuard {
         refundIfOver(publicPrice * quantity);
     }
 
+    // 由於荷蘭拍去 mint 時, 剛好時間區間已經跳到下一個金額了, 所以必須將多出的錢還給使用者
     function refundIfOver(uint256 price) private {
         require(msg.value >= price, "Need to send more ETH.");
         if (msg.value > price) {
@@ -189,7 +200,10 @@ contract Leozuki is Ownable, ERC721A, ERC721AOwnersExplicit, ReentrancyGuard {
         saleConfig.publicSaleKey = key;
     }
 
-    // 白名單
+    /**
+     * addresses - 白名單地址
+     * numSlots - 白名單可mint數量
+     */
     function seedAllowlist(
         address[] memory addresses,
         uint256[] memory numSlots
@@ -244,10 +258,16 @@ contract Leozuki is Ownable, ERC721A, ERC721AOwnersExplicit, ReentrancyGuard {
         _setOwnersExplicit(quantity);
     }
 
+    /**
+     * 用戶已經 mint 數量
+     */
     function numberMinted(address owner) public view returns (uint256) {
         return _numberMinted(owner);
     }
 
+    /**
+     * 獲得擁有者訊息
+     */
     function getOwnershipData(uint256 tokenId)
         external
         view

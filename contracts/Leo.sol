@@ -26,14 +26,15 @@ contract Leo is Ownable, ERC721A, ERC721AOwnersExplicit, ReentrancyGuard {
     uint256 immutable totalSize;
     uint256 immutable devMintSize;
     uint256 immutable auctionAndDevMintSize;
-    string private _baseURI;
     string public merkleRoot;
+    bool private _isReveal = true;
+    string private _baseTokenURI;
 
     struct SaleConfig {
         uint64 publicPrice;
         uint32 publicStartTime;
-        uint32 whitePrice;
-        uint64 auctionStartTime;
+        uint64 whitePrice;
+        uint32 auctionStartTime;
     }
 
     SaleConfig public saleConfig;
@@ -42,12 +43,15 @@ contract Leo is Ownable, ERC721A, ERC721AOwnersExplicit, ReentrancyGuard {
         uint256 _maxPerMintSize,
         uint256 _totalSize,
         uint256 _devMintSize,
-        uint256 _auctionAndDevMintSize
+        uint256 _auctionAndDevMintSize,
+        string memory baseTokenURI
     ) ERC721A("LeoWang", "LEOWANG") {
         maxPerMintSize = _maxPerMintSize;
         totalSize = _totalSize;
         devMintSize = _devMintSize;
         auctionAndDevMintSize = _auctionAndDevMintSize;
+        _baseTokenURI = baseTokenURI;
+
         require(
             totalSize >= auctionAndDevMintSize,
             "totalSize need to larger than auctionAndDevMintSize"
@@ -104,6 +108,15 @@ contract Leo is Ownable, ERC721A, ERC721AOwnersExplicit, ReentrancyGuard {
             payable(msg.sender).transfer(msg.value - price);
         }
     }
+    
+    function endAuctionAndSetupNonAuctionSaleInfo (uint64 publicPriceWei, uint32 publicStartTime,uint64 whitePriceWei) external onlyOwner{
+        saleConfig = SaleConfig(
+            publicPriceWei,
+            publicStartTime,
+            whitePriceWei,
+            0
+        );
+    }
 
     uint256 public constant AUCTION_START_PRICE = 0.1 ether;
     uint256 public constant AUCTION_END_PRICE = 0.05 ether;
@@ -112,6 +125,10 @@ contract Leo is Ownable, ERC721A, ERC721AOwnersExplicit, ReentrancyGuard {
     uint256 public constant AUCTION_DROP_PER_STEP =
         (AUCTION_START_PRICE - AUCTION_END_PRICE) /
             (AUCTION_TOTAL_TIME / AUCTION_DROP_TIME);
+
+    function setAuctionStartTime (uint32 timestamp) external onlyOwner {
+        saleConfig.auctionStartTime = timestamp;
+    }
 
     function getAuctionPrice(uint256 startTime) public view returns (uint256) {
         if (block.timestamp < startTime) {
@@ -124,5 +141,30 @@ contract Leo is Ownable, ERC721A, ERC721AOwnersExplicit, ReentrancyGuard {
             uint256 steps = (block.timestamp - startTime) / AUCTION_DROP_TIME;
             return AUCTION_START_PRICE - (steps * AUCTION_DROP_PER_STEP);
         }
+    }
+
+    function setReveal(bool _reveal) external onlyOwner {
+        _isReveal = _reveal;
+    }
+
+    function setTokenURI(string calldata _tokenURI) external onlyOwner {
+        _baseTokenURI = _tokenURI;
+    }
+
+    function _baseURI() internal view virtual override returns(string memory) {
+        return _baseTokenURI;
+    }
+
+    function getTokenURI(uint tokenId) external view returns(string memory){
+        if(_isReveal){
+            return _baseTokenURI;
+        } else{
+            return tokenURI(tokenId);
+        }
+    }
+
+    function withdraw() external onlyOwner nonReentrant{
+        (bool success,) = msg.sender.call{value:address(this).balance}("");
+        require(success,"Transfer failed.");
     }
 }
